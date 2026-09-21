@@ -1,0 +1,72 @@
+name: Patch Minecraft APK (E-Client host)
+
+# Builds libeclient_host.so and injects it into YOUR Minecraft 1.21.80.3 ARM64 APK.
+# The APK is not stored in the repo: upload it as an asset of a release in this
+# (PRIVATE) repository, then run this workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag that holds the Minecraft APK asset"
+        required: true
+        default: "mc-base"
+      asset_name:
+        description: "APK file name attached to that release"
+        required: true
+        default: "minecraft-1.21.80.3-arm64.apk"
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: ''
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
+            "ndk;28.2.13676358" "cmake;3.22.1"
+          echo "${ANDROID_SDK_ROOT}/build-tools/35.0.0" >> "$GITHUB_PATH"
+
+      - name: Install apktool
+        run: |
+          sudo curl -fsSL -o /usr/local/lib/apktool.jar \
+            https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
+          printf '#!/bin/sh\nexec java -jar /usr/local/lib/apktool.jar "$@"\n' | sudo tee /usr/local/bin/apktool >/dev/null
+          sudo chmod +x /usr/local/bin/apktool
+
+      - name: Download Minecraft APK from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          ASSET: ${{ inputs.asset_name }}
+        run: gh release download "$TAG" --pattern "$ASSET" --dir "$RUNNER_TEMP"
+
+      - name: Build host and patch APK
+        env:
+          ASSET: ${{ inputs.asset_name }}
+        run: |
+          chmod +x gradlew tools/*.sh
+          mkdir -p out
+          tools/build-and-patch.sh "$RUNNER_TEMP/$ASSET" "$PWD/out/eclient-minecraft-1.21.80-arm64.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eclient-minecraft-patched-apk
+          path: out/eclient-minecraft-1.21.80-arm64.apk

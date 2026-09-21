@@ -1,0 +1,52 @@
+name: Build E-Client Minecraft Host
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  native-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: ''
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+          set +o pipefail
+          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null || true
+          set -o pipefail
+      - name: Build native host
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:externalNativeBuildDebug --stacktrace
+      - name: Collect host library
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p host-artifact
+          find app/build -type f -name 'libeclient_host.so' -print -exec cp {} host-artifact/ \;
+          test -f host-artifact/libeclient_host.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eclient-minecraft-host-arm64
+          path: host-artifact/libeclient_host.so

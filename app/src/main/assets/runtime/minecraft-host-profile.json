@@ -1,0 +1,11 @@
+{
+  "client": "E-Client",
+  "mode": "minecraft-hosted-in-process",
+  "abi": "arm64-v8a",
+  "known_profile": "1.21.80.3",
+  "library_sha256": "95c01125cf43942f55020c9015bdbe76a8b986d723de9a84869e25190a8d9c72",
+  "build_id": "665d33595ddec90fe7347a45cd4da65e6f0871aa",
+  "native_library": "libeclient_host.so",
+  "memory_mode": "in-process",
+  "status": "verified-bootstrap"
+}
